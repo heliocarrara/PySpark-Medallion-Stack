@@ -1,3 +1,14 @@
+"""
+Gold Layer Transformation: Silver to Gold.
+
+This script aggregates cleaned transaction data from the 'silver' zone
+and enriches it with user reference data from an external Postgres database.
+It generates hourly and daily aggregated tables for final analytics.
+
+Usage:
+    python transform_gold.py
+"""
+
 from __future__ import annotations
 
 import os
@@ -8,16 +19,22 @@ from pyspark.sql import functions as F
 
 
 def find_lake_root(start: Path) -> Path:
+    """
+    Attempts to locate the 'data_lake' directory by searching upwards
+    from the start directory or using environment variables.
+    """
     env_value = os.environ.get("LAKE_ROOT")
     if env_value:
         candidate = Path(env_value).expanduser().resolve()
         if candidate.exists():
             return candidate
 
+    # Check common Docker-based paths
     jovyan_candidate = Path("/home/jovyan/work/data_lake")
     if jovyan_candidate.exists():
         return jovyan_candidate
 
+    # Recursive search upwards
     current = start.resolve()
     for _ in range(12):
         candidate = current / "data_lake"
@@ -30,6 +47,9 @@ def find_lake_root(start: Path) -> Path:
 
 
 def build_spark_session(app_name: str) -> SparkSession:
+    """
+    Initializes a Spark Session with Delta Lake and PostgreSQL JDBC support.
+    """
     spark_master = os.environ.get("SPARK_MASTER", "local[*]")
     return (
         SparkSession.builder.appName(app_name)
@@ -50,6 +70,9 @@ def build_spark_session(app_name: str) -> SparkSession:
 
 
 def ensure_writable_dir(path: Path) -> None:
+    """
+    Ensures a directory exists and attempts to set broad write permissions.
+    """
     path.mkdir(parents=True, exist_ok=True)
     try:
         os.chmod(path, 0o777)
@@ -57,20 +80,29 @@ def ensure_writable_dir(path: Path) -> None:
         return
 
 
-
 def main() -> int:
+    """
+    Main Gold-layer logic to enrich and aggregate silver data.
+    """
+    # 1. Setup paths
     lake_root = find_lake_root(Path.cwd())
-
     silver_path = str(lake_root / "silver" / "xlm_transactions")
     gold_root = lake_root / "gold"
     gold_hourly_path = str(gold_root / "xlm_hourly")
     gold_daily_path = str(gold_root / "xlm_daily")
     gold_country_daily_path = str(gold_root / "xlm_by_country_daily")
+    pbi_export_root = gold_root / "pbi"
+    pbi_hourly_path = str(pbi_export_root / "xlm_hourly")
+    pbi_daily_path = str(pbi_export_root / "xlm_daily")
+    pbi_country_daily_path = str(pbi_export_root / "xlm_by_country_daily")
 
+    # 2. Build Spark Session
     spark = build_spark_session("engineering-project-xlm-gold")
 
+    # 3. Read Silver Data (Delta)
     silver_df = spark.read.format("delta").load(silver_path)
 
+    # 4. Fetch User Data (PostgreSQL via JDBC)
     jdbc_url = "jdbc:postgresql://postgres:5432/xlm"
     jdbc_props = {
         "user": "xlm",
@@ -79,6 +111,7 @@ def main() -> int:
     }
     users_df = spark.read.jdbc(url=jdbc_url, table="users", properties=jdbc_props)
 
+    # 5. Aggregate: Hourly Performance
     hourly_df = (
         silver_df.groupBy(F.date_trunc("hour", F.col("event_ts")).alias("hour_ts"))
         .agg(
@@ -90,6 +123,7 @@ def main() -> int:
         .orderBy(F.col("hour_ts").asc())
     )
 
+    # 6. Aggregate: Daily Trends
     daily_df = (
         silver_df.groupBy(F.date_trunc("day", F.col("event_ts")).alias("day_ts"))
         .agg(
@@ -101,6 +135,7 @@ def main() -> int:
         .orderBy(F.col("day_ts").asc())
     )
 
+    # 7. Aggregate: Daily Trends By Country (Join included)
     by_country_daily_df = (
         silver_df.alias("s")
         .join(users_df.alias("u"), F.col("s.user_id") == F.col("u.user_id"), "inner")
@@ -117,17 +152,37 @@ def main() -> int:
         .orderBy(F.col("day_ts").asc(), F.col("country_code").asc())
     )
 
+    # 8. Ensure storage and write all Gold tables (Delta)
     ensure_writable_dir(gold_root)
     ensure_writable_dir(Path(gold_hourly_path))
     ensure_writable_dir(Path(gold_daily_path))
     ensure_writable_dir(Path(gold_country_daily_path))
+    ensure_writable_dir(pbi_export_root)
+    ensure_writable_dir(Path(pbi_hourly_path))
+    ensure_writable_dir(Path(pbi_daily_path))
+    ensure_writable_dir(Path(pbi_country_daily_path))
+
     hourly_df.write.format("delta").mode("overwrite").save(gold_hourly_path)
     daily_df.write.format("delta").mode("overwrite").save(gold_daily_path)
     by_country_daily_df.write.format("delta").mode("overwrite").save(gold_country_daily_path)
 
-    print(f"WROTE {gold_hourly_path}")
-    print(f"WROTE {gold_daily_path}")
-    print(f"WROTE {gold_country_daily_path}")
+    # 9. Write to Serving Layer (Postgres) for Power BI
+    print("Writing gold tables to Postgres serving layer...")
+    hourly_df.write.jdbc(url=jdbc_url, table="gold_xlm_hourly", mode="overwrite", properties=jdbc_props)
+    daily_df.write.jdbc(url=jdbc_url, table="gold_xlm_daily", mode="overwrite", properties=jdbc_props)
+    by_country_daily_df.write.jdbc(url=jdbc_url, table="gold_xlm_by_country_daily", mode="overwrite", properties=jdbc_props)
+    hourly_df.write.mode("overwrite").parquet(pbi_hourly_path)
+    daily_df.write.mode("overwrite").parquet(pbi_daily_path)
+    by_country_daily_df.write.mode("overwrite").parquet(pbi_country_daily_path)
+
+    # 10. Results
+    print(f"WROTE Delta: {gold_hourly_path}")
+    print(f"WROTE Delta: {gold_daily_path}")
+    print(f"WROTE Delta: {gold_country_daily_path}")
+    print(f"WROTE Parquet: {pbi_hourly_path}")
+    print(f"WROTE Parquet: {pbi_daily_path}")
+    print(f"WROTE Parquet: {pbi_country_daily_path}")
+    print("FINISHED writing to Postgres.")
 
     spark.stop()
     return 0

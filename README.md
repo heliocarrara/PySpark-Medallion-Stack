@@ -20,6 +20,12 @@ Diagram: create in Excalidraw and export as an image. Suggestion: https://excali
    - JupyterLab: http://localhost:8888
    - Postgres: localhost:5432
 
+4. Run Analytics (Gold Layer):
+   - `python 04_analytics_gold/transform_gold.py`
+
+5. Open Dashboard:
+   - Connect Power BI Desktop to `localhost:5432` (Postgres) as described in [05_dashboard_pbi](file:///c:/Users/helio/source/repos/engineering-project-xlm/05_dashboard_pbi).
+
 To stop:
 - `docker compose down`
 
