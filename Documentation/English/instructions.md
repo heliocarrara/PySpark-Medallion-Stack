@@ -21,6 +21,7 @@ Simulate the system that generates money/data for the company.
 Azure Data Factory (ADF) moves data. Show you understand **metadata**.
 * **`ingest_to_bronze.py`**: Reads from `landing/` and moves to `bronze/`.
 * **The Differentiator**: While moving data, the script must create date-partitioned folders: `/bronze/year=2026/month=03/day=23/`. This mimics what ADF does under the hood to optimize performance.
+* Status: 10 arquivos movidos para `bronze/year=2026/month=03/day=23/`.
 
 ---
 
