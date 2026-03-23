@@ -1,3 +1,14 @@
+"""
+Producer Simulation for XLM Transactions.
+
+This script generates simulated XLM (Stellar) transaction data in JSON format.
+The generated files are saved to a landing zone in the project's data lake,
+simulating a real-world ingestion process.
+
+Usage:
+    python producer.py --count 100 --min-price 0.11 --max-price 0.13
+"""
+
 import argparse
 import json
 import random
@@ -9,6 +20,9 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class XlmTransactionV1:
+    """
+    Data structure representing a single XLM transaction version 1.
+    """
     transaction_id: str
     user_id: int
     asset_symbol: str
@@ -20,12 +34,18 @@ class XlmTransactionV1:
 
 
 def _format_event_ts(dt: datetime) -> str:
+    """
+    Formats a datetime object into a UTC ISO8601 string with 'Z' suffix.
+    """
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _filename_timestamp(dt: datetime) -> str:
+    """
+    Formats a datetime object into a string suitable for filenames.
+    """
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -42,6 +62,9 @@ def generate_transaction(
     user_id_min: int,
     user_id_max: int,
 ) -> XlmTransactionV1:
+    """
+    Generates a single randomized XLM transaction.
+    """
     price = round(rng.uniform(min_price, max_price), 5)
     volume = round(rng.uniform(min_volume, max_volume), 2)
     notional = round(price * volume, 2)
@@ -58,6 +81,9 @@ def generate_transaction(
 
 
 def write_transaction_json(*, output_dir: Path, tx: XlmTransactionV1, event_dt: datetime) -> Path:
+    """
+    Writes a transaction dataclass object to a JSON file in the specified output directory.
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     file_name = f"xlm_{tx.schema_version}_{_filename_timestamp(event_dt)}.json"
     output_path = output_dir / file_name
@@ -70,6 +96,9 @@ def write_transaction_json(*, output_dir: Path, tx: XlmTransactionV1, event_dt: 
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parses command-line arguments for the producer script.
+    """
     parser = argparse.ArgumentParser(description="Generate fake XLM transaction JSON files into data_lake/landing.")
     parser.add_argument("--count", type=int, default=1, help="Number of JSON files to generate.")
     parser.add_argument(
@@ -89,6 +118,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """
+    Main execution loop for generating and writing transaction files.
+    """
     args = parse_args()
     if args.count < 1:
         raise SystemExit("--count must be >= 1")
@@ -100,8 +132,10 @@ def main() -> int:
     rng = random.Random(args.seed)
     base_dt = datetime.now(timezone.utc)
 
+    # Generate and write requested count of transactions
     written: list[Path] = []
     for i in range(args.count):
+        # Slightly offset timestamp for each file
         event_dt = base_dt + timedelta(microseconds=i)
         tx = generate_transaction(
             rng=rng,
@@ -115,6 +149,7 @@ def main() -> int:
         )
         written.append(write_transaction_json(output_dir=output_dir, tx=tx, event_dt=event_dt))
 
+    # Print created file paths
     for path in written:
         print(path.as_posix())
 
@@ -123,3 +158,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

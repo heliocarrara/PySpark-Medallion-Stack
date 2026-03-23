@@ -1,3 +1,14 @@
+"""
+Ingestion Script: Landing to Bronze.
+
+This script moves raw JSON files from the 'landing' directory to a partitioned
+'bronze' directory. It uses the file content or modification times to determine
+the correct destination partition (year/month/day).
+
+Usage:
+    python ingest_to_bronze.py --max-files 100 --dry-run
+"""
+
 import argparse
 import json
 import shutil
@@ -9,12 +20,18 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class IngestResult:
+    """
+    Summary of the ingestion execution results.
+    """
     scanned: int
     moved: int
     skipped: int
 
 
 def _parse_event_ts(value: object) -> datetime | None:
+    """
+    Parses an ISO8601 string or 'Z' formatted timestamp into a UTC datetime object.
+    """
     if not isinstance(value, str) or not value.strip():
         return None
     try:
@@ -24,20 +41,30 @@ def _parse_event_ts(value: object) -> datetime | None:
 
 
 def _safe_destination_path(dest_dir: Path, filename: str) -> Path:
+    """
+    Generates a unique destination path if the filename already exists in the target directory.
+    """
     candidate = dest_dir / filename
     if not candidate.exists():
         return candidate
+    # Append unique ID if file already exists to avoid overwriting
     stem = Path(filename).stem
     suffix = Path(filename).suffix
     return dest_dir / f"{stem}_{uuid.uuid4().hex}{suffix}"
 
 
 def ingest_one(*, source_path: Path, bronze_root: Path, dry_run: bool) -> bool:
+    """
+    Processes a single file from landing to the appropriate bronze partition.
+    """
     try:
+        # Attempt to read file content to find event_ts
         payload = json.loads(source_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
+        # Skip if file is unreadable or not a valid JSON
         return False
 
+    # Extract date from payload or fallback to file modification time
     event_dt = _parse_event_ts(payload.get("event_ts") if isinstance(payload, dict) else None)
     if event_dt is None:
         try:
@@ -45,6 +72,7 @@ def ingest_one(*, source_path: Path, bronze_root: Path, dry_run: bool) -> bool:
         except OSError:
             return False
 
+    # Define Hive-style partition directory: year=YYYY/month=MM/day=DD
     dest_dir = (
         bronze_root
         / f"year={event_dt.year:04d}"
@@ -57,6 +85,7 @@ def ingest_one(*, source_path: Path, bronze_root: Path, dry_run: bool) -> bool:
         print(f"DRY_RUN {source_path.as_posix()} -> {dest_path.as_posix()}")
         return True
 
+    # Ensure partition folder exists and move the file
     dest_dir.mkdir(parents=True, exist_ok=True)
     shutil.move(str(source_path), str(dest_path))
     print(f"MOVED {source_path.as_posix()} -> {dest_path.as_posix()}")
@@ -64,6 +93,9 @@ def ingest_one(*, source_path: Path, bronze_root: Path, dry_run: bool) -> bool:
 
 
 def parse_args() -> argparse.Namespace:
+    """
+    Parses command-line arguments for the ingestion script.
+    """
     parser = argparse.ArgumentParser(description="Move JSON files from data_lake/landing to data_lake/bronze (partitioned).")
     parser.add_argument(
         "--landing-dir",
@@ -84,16 +116,21 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """
+    Main loop to find and process files from landing to bronze.
+    """
     args = parse_args()
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.parent
 
+    # Setup directories
     landing_dir: Path = args.landing_dir if args.landing_dir is not None else (repo_root / "data_lake" / "landing")
     bronze_dir: Path = args.bronze_dir if args.bronze_dir is not None else (repo_root / "data_lake" / "bronze")
 
     if not landing_dir.exists():
         raise SystemExit(f"Landing directory does not exist: {landing_dir.as_posix()}")
 
+    # Collect source files
     sources = sorted(landing_dir.glob(args.pattern))
     if args.max_files is not None:
         if args.max_files < 1:
@@ -104,6 +141,7 @@ def main() -> int:
     moved = 0
     skipped = 0
 
+    # Process each file
     for source_path in sources:
         ok = ingest_one(source_path=source_path, bronze_root=bronze_dir, dry_run=args.dry_run)
         if ok:
@@ -111,6 +149,7 @@ def main() -> int:
         else:
             skipped += 1
 
+    # Report results
     result = IngestResult(scanned=scanned, moved=moved, skipped=skipped)
     print(json.dumps(result.__dict__, separators=(",", ":")))
     return 0
@@ -118,3 +157,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

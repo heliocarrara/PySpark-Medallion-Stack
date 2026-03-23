@@ -62,6 +62,7 @@ def main() -> int:
     lake_root = find_lake_root(Path.cwd())
 
     silver_path = str(lake_root / "silver" / "xlm_transactions")
+    gold_root = lake_root / "gold"
     gold_hourly_path = str(gold_root / "xlm_hourly")
     gold_daily_path = str(gold_root / "xlm_daily")
     gold_country_daily_path = str(gold_root / "xlm_by_country_daily")
@@ -120,9 +121,9 @@ def main() -> int:
     ensure_writable_dir(Path(gold_hourly_path))
     ensure_writable_dir(Path(gold_daily_path))
     ensure_writable_dir(Path(gold_country_daily_path))
-    hourly_df.write.mode("overwrite").parquet(gold_hourly_path)
-    daily_df.write.mode("overwrite").parquet(gold_daily_path)
-    by_country_daily_df.write.mode("overwrite").parquet(gold_country_daily_path)
+    hourly_df.write.format("delta").mode("overwrite").save(gold_hourly_path)
+    daily_df.write.format("delta").mode("overwrite").save(gold_daily_path)
+    by_country_daily_df.write.format("delta").mode("overwrite").save(gold_country_daily_path)
 
     print(f"WROTE {gold_hourly_path}")
     print(f"WROTE {gold_daily_path}")
