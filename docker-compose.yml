@@ -69,8 +69,10 @@ services:
       - CHOWN_HOME=yes
       - CHOWN_HOME_OPTS=-R
       - SPARK_MASTER=spark://spark-master:7077
+      - LAKE_ROOT=/data_lake
     volumes:
       - ./data_lake:/home/jovyan/work/data_lake
+      - ./data_lake:/data_lake
       - ./03_processing_silver:/home/jovyan/work/03_processing_silver
       - ./04_analytics_gold:/home/jovyan/work/04_analytics_gold
     ports:
