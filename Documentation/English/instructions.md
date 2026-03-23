@@ -1,58 +1,58 @@
 
 ---
 
-### 1. Raiz do Projeto (`/`)
-* **`docker-compose.yml`**: Define a infraestrutura. Deve subir um container de **Spark** (Bitnami é uma ótima escolha), um **Postgres** (para simular dados de cadastro de usuários) e o **Jupyter Lab** (para você codar no VS Code via browser ou extensão).
-* **`README.md`**: É o seu cartão de visitas. Deve conter um diagrama da arquitetura (pode fazer no [Excalidraw](https://excalidraw.com/)), explicação da stack e instruções de como rodar o `docker-compose`.
-* **`.gitignore`**: Essencial para não subir lixo, pastas `__pycache__` ou os dados pesados da pasta `data_lake/` (suba apenas a estrutura de pastas, não os milhares de JSONs).
+### 1. Project Root (`/`)
+* **`docker-compose.yml`**: Defines the local infrastructure. It should start containers for **Spark**, **Postgres** (to simulate user registry/reference data), and **JupyterLab** (so you can code notebooks from VS Code via browser or extension).
+* **`README.md`**: Your project overview. Include an architecture diagram (you can draw it in [Excalidraw](https://excalidraw.com/)), explain the stack, and provide instructions to run `docker compose`.
+* **`.gitignore`**: Essential to avoid committing junk, `__pycache__` folders, or heavy data from `data_lake/` (commit only the folder structure, not thousands of JSONs).
 
 ---
 
-### 2. `01_source_simulation/` (A Origem)
-Aqui você simula o sistema que gera o dinheiro/dados para a empresa.
-* **`producer.py`**: Script que gera o JSON da transação de XLM. Como você quer simular a API, use a biblioteca `random` para flutuar o preço entre **0.10 e 0.15** e gerar volumes aleatórios.
-* **Lógica de Negócio**: O script deve salvar o arquivo na pasta `data_lake/landing/`. Para ser realista, salve com o nome: `xlm_v1_TIMESTAMP.json`.
+### 2. `01_source_simulation/` (The Source)
+Simulate the system that generates money/data for the company.
+* **`producer.py`**: Script that generates an XLM transaction JSON. To simulate the API, use Python’s `random` library to fluctuate the price between **0.10 and 0.15** and produce random volumes.
+* **Business Logic**: The script must save the file into `data_lake/landing/`. Use a realistic filename: `xlm_v1_TIMESTAMP.json`.
 
 ---
 
-### 3. `02_ingestion_bronze/` (O "Fake" Data Factory)
-O Azure Data Factory (ADF) move dados. Aqui você mostra que entende de **Metadados**.
-* **`ingest_to_bronze.py`**: Este script lê da `landing/` e move para a `bronze/`.
-* **O Diferencial**: Ao mover o dado, o script deve criar pastas por data (particionamento): `/bronze/year=2026/month=03/day=23/`. Isso é o que o ADF faz por baixo dos panos para otimizar a performance.
+### 3. `02_ingestion_bronze/` (The “Fake” Data Factory)
+Azure Data Factory (ADF) moves data. Show you understand **metadata**.
+* **`ingest_to_bronze.py`**: Reads from `landing/` and moves to `bronze/`.
+* **The Differentiator**: While moving data, the script must create date-partitioned folders: `/bronze/year=2026/month=03/day=23/`. This mimics what ADF does under the hood to optimize performance.
 
 ---
 
-### 4. `03_processing_silver/` (O Reino do PySpark)
-Aqui você brilha no código de engenharia pesado.
-* **`transform_silver.ipynb`**: Um notebook que lê os JSONs da Bronze usando **PySpark**.
-* **O que fazer aqui**: 
-    * Definir o `Schema` (não deixe o Spark adivinhar, defina os tipos explicitamente).
-    * Tratar nulos (se o preço vier nulo, descarta a linha ou preenche com a média).
-    * **Delta Lake**: Salve o resultado final em formato `.delta`. O Delta permite que você dê um "UPDATE" ou "DELETE" em dados do Lake, algo que a vaga de Databricks exige que você saiba.
+### 4. `03_processing_silver/` (The PySpark Kingdom)
+Here you shine with solid engineering code.
+* **`transform_silver.ipynb`**: Notebook that reads Bronze JSONs using **PySpark**.
+* **What to do here**:
+    * Define the `Schema` (don’t let Spark infer; set explicit types).
+    * Handle nulls (if price is null, drop the row or fill with the mean).
+    * **Delta Lake**: Save the final result in `.delta` format. Delta supports “UPDATE” and “DELETE” on lake data—an important Databricks requirement.
 
 ---
 
-### 5. `04_analytics_gold/` (Modelagem SQL)
-Aqui você prepara o banquete para os analistas de negócios.
-* **`model_gold_tables.sql`**: Queries que pegam a tabela Silver e transformam em tabelas de negócio.
-* **O que fazer aqui**: 
-    * **Agregações**: Preço médio por hora, volume total por dia.
-    * **Join**: Cruzar a transação com a tabela de usuários (que está no seu Postgres do Docker) para saber de qual país veio a compra.
-    * O resultado final deve ser salvo na pasta `gold/` (também em Delta ou Parquet).
+### 5. `04_analytics_gold/` (SQL Modeling)
+Prepare the banquet for business analysts.
+* **`model_gold_tables.sql`**: Queries that take Silver tables and transform them into business tables.
+* **What to do here**:
+    * **Aggregations**: Average price per hour, total volume per day.
+    * **Join**: Join transactions with the users table (in your Docker Postgres) to know which country the purchase came from.
+    * Save the final result in the `gold/` folder (Delta or Parquet).
 
 ---
 
-### 6. `05_dashboard_pbi/` (Visualização)
-* **`xlm_dashboard.pbix`**: O arquivo final.
-* **Dica Profissional**: Como você usou Docker, no Power BI você vai selecionar "Obter Dados" -> "Pasta" e apontar para a sua pasta `data_lake/gold/`. Quando novos dados chegarem na Gold via Spark, o Power BI atualizará no clique.
+### 6. `05_dashboard_pbi/` (Visualization)
+* **`xlm_dashboard.pbix`**: The final file.
+* **Pro Tip**: Since you used Docker, in Power BI select “Get Data” → “Folder” and point to `data_lake/gold/`. When new data arrives in Gold via Spark, Power BI refreshes on click.
 
 ---
 
-### 7. `data_lake/` (O Armazenamento)
-Esta pasta simula o seu **Azure Data Lake Gen2**. Ela deve ser organizada para que qualquer ferramenta saiba onde achar o quê.
-* **Landing**: Dados brutos e desorganizados.
-* **Bronze**: Dados originais, mas particionados por data.
-* **Silver**: Dados limpos, tipados e em formato Delta.
-* **Gold**: Tabelas prontas para o BI (Star Schema).
+### 7. `data_lake/` (Storage)
+This folder simulates your **Azure Data Lake Gen2**. Organize it so any tool can find what it needs.
+* **Landing**: Raw, unorganized data.
+* **Bronze**: Original data, partitioned by date.
+* **Silver**: Cleaned, typed data in Delta format.
+* **Gold**: BI-ready tables (Star Schema).
 
 ---
