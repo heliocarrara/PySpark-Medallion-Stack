@@ -7,15 +7,26 @@ from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
 
-def find_repo_root(start: Path) -> Path:
+def find_lake_root(start: Path) -> Path:
+    env_value = os.environ.get("LAKE_ROOT")
+    if env_value:
+        candidate = Path(env_value).expanduser().resolve()
+        if candidate.exists():
+            return candidate
+
+    jovyan_candidate = Path("/home/jovyan/work/data_lake")
+    if jovyan_candidate.exists():
+        return jovyan_candidate
+
     current = start.resolve()
     for _ in range(12):
-        if (current / "docker-compose.yml").exists():
-            return current
+        candidate = current / "data_lake"
+        if candidate.exists():
+            return candidate
         if current.parent == current:
             break
         current = current.parent
-    raise RuntimeError("Could not find repo root (docker-compose.yml)")
+    raise RuntimeError("Could not find data_lake folder")
 
 
 def build_spark_session(app_name: str) -> SparkSession:
@@ -39,8 +50,7 @@ def build_spark_session(app_name: str) -> SparkSession:
 
 
 def main() -> int:
-    repo_root = find_repo_root(Path.cwd())
-    lake_root = repo_root / "data_lake"
+    lake_root = find_lake_root(Path.cwd())
 
     silver_path = str(lake_root / "silver" / "xlm_transactions")
     gold_root = lake_root / "gold"
