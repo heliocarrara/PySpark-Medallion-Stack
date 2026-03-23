@@ -8,6 +8,7 @@ services:
       POSTGRES_DB: xlm
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
@@ -68,6 +69,7 @@ services:
     volumes:
       - ./data_lake:/home/jovyan/work/data_lake
       - ./03_processing_silver:/home/jovyan/work/03_processing_silver
+      - ./04_analytics_gold:/home/jovyan/work/04_analytics_gold
     ports:
       - "8888:8888"
     depends_on:
