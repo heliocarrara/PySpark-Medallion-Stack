@@ -43,6 +43,7 @@ Prepare the banquet for business analysts.
     * **Aggregations**: Average price per hour, total volume per day.
     * **Join**: Join transactions with the users table (in your Docker Postgres) to know which country the purchase came from.
     * Save the final result in the `gold/` folder (Delta or Parquet).
+* Status: Gold gerado em Delta (`gold/xlm_hourly`, `gold/xlm_daily`, `gold/xlm_by_country_daily`) com leitura de `users` via Postgres.
 
 ---
 
