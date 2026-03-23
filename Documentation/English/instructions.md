@@ -5,6 +5,7 @@
 * **`docker-compose.yml`**: Defines the local infrastructure. It should start containers for **Spark**, **Postgres** (to simulate user registry/reference data), and **JupyterLab** (so you can code notebooks from VS Code via browser or extension).
 * **`README.md`**: Your project overview. Include an architecture diagram (you can draw it in [Excalidraw](https://excalidraw.com/)), explain the stack, and provide instructions to run `docker compose`.
 * **`.gitignore`**: Essential to avoid committing junk, `__pycache__` folders, or heavy data from `data_lake/` (commit only the folder structure, not thousands of JSONs).
+* Status: Infra iniciada com Docker Compose (xlm-postgres, xlm-spark-master, xlm-spark-worker-1, xlm-jupyter em execução).
 
 ---
 
