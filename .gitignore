@@ -6,7 +6,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 .env
-data_lake/
-data_lake/**/*
+data_lake/**
+!data_lake/**/
+!data_lake/.gitkeep
+!data_lake/**/.gitkeep
 postgres-data/
 postgres-data/**/*
