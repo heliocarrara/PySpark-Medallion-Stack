@@ -13,6 +13,7 @@
 Simulate the system that generates money/data for the company.
 * **`producer.py`**: Script that generates an XLM transaction JSON. To simulate the API, use Python’s `random` library to fluctuate the price between **0.10 and 0.15** and produce random volumes.
 * **Business Logic**: The script must save the file into `data_lake/landing/`. Use a realistic filename: `xlm_v1_TIMESTAMP.json`.
+* Status: 10 arquivos gerados em `data_lake/landing/` com preços entre 0.10–0.15 e volumes aleatórios.
 
 ---
 
