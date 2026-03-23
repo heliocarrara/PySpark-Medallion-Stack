@@ -42,10 +42,22 @@ def build_spark_session(app_name: str) -> SparkSession:
     )
 
 
+def ensure_writable_dir(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    try:
+        os.chmod(path, 0o777)
+    except PermissionError:
+        return
+
+
+
 def main() -> int:
-    lake_root = find_lake_root(Path.cwd())
     bronze_path = str(lake_root / "bronze")
-    silver_path = str(lake_root / "silver" / "xlm_transactions")
+    silver_base_dir = lake_root / "silver"
+    silver_dir = silver_base_dir / "xlm_transactions"
+    ensure_writable_dir(silver_base_dir)
+    ensure_writable_dir(silver_dir)
+    silver_path = str(silver_dir)
 
     spark = build_spark_session("engineering-project-xlm-silver")
 
