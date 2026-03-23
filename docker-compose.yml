@@ -60,6 +60,9 @@ services:
   jupyter:
     image: jupyter/pyspark-notebook:latest
     container_name: xlm-jupyter
+    command: >
+      bash -lc "python -c 'import pyspark' >/dev/null 2>&1 || pip install --no-cache-dir pyspark==3.5.0 delta-spark==3.2.0;
+      start-notebook.sh"
     environment:
       - JUPYTER_ENABLE_LAB=yes
       - JUPYTER_TOKEN=xlm
