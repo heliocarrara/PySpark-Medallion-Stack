@@ -50,6 +50,7 @@ Prepare the banquet for business analysts.
 ### 6. `05_dashboard_pbi/` (Visualization)
 * **`xlm_dashboard.pbix`**: The final file.
 * **Pro Tip**: Since you used Docker, in Power BI select “Get Data” → “Folder” and point to `data_lake/gold/`. When new data arrives in Gold via Spark, Power BI refreshes on click.
+* Status: Pasta pronta para conectar o Power BI a `data_lake/gold/` (usar “Get Data” → “Folder”).
 
 ---
 
@@ -59,5 +60,6 @@ This folder simulates your **Azure Data Lake Gen2**. Organize it so any tool can
 * **Bronze**: Original data, partitioned by date.
 * **Silver**: Cleaned, typed data in Delta format.
 * **Gold**: BI-ready tables (Star Schema).
+* Status: Estrutura pronta — `landing/` populada, `bronze/` particionada por data, `silver/xlm_transactions` em Delta, `gold/` com tabelas Delta para BI.
 
 ---
