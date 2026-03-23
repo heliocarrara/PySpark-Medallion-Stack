@@ -52,6 +52,7 @@ def ensure_writable_dir(path: Path) -> None:
 
 
 def main() -> int:
+    lake_root = find_lake_root(Path.cwd())
     bronze_path = str(lake_root / "bronze")
     silver_base_dir = lake_root / "silver"
     silver_dir = silver_base_dir / "xlm_transactions"
