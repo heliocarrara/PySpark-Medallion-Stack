@@ -32,6 +32,7 @@ Here you shine with solid engineering code.
     * Define the `Schema` (don’t let Spark infer; set explicit types).
     * Handle nulls (if price is null, drop the row or fill with the mean).
     * **Delta Lake**: Save the final result in `.delta` format. Delta supports “UPDATE” and “DELETE” on lake data—an important Databricks requirement.
+* Status: Silver escrito em Delta (`silver/xlm_transactions`) com 20 linhas processadas.
 
 ---
 
