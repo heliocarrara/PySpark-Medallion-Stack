@@ -2,7 +2,7 @@
 
 This repository simulates an end-to-end data pipeline (landing → bronze → silver → gold) using Docker for local infrastructure.
 
-![alt text](Documentation\English\Images\image6.png)
+![alt text](Documentation/English/Images/image6.png)
 
 ## Architecture
 - Postgres: simulates user registry/reference data.
@@ -14,7 +14,8 @@ This repository simulates an end-to-end data pipeline (landing → bronze → si
 1. Install and open Docker Desktop.
 2. From the project root, run:
    - `docker compose up -d`
-   ![alt text](Documentation\English\Images\image5.png)
+   
+   ![alt text](Documentation/English/Images/image5.png)
 3. Verify:
    - Spark Master UI: http://localhost:8080
    - Spark Worker UI: http://localhost:8081
@@ -27,7 +28,7 @@ This repository simulates an end-to-end data pipeline (landing → bronze → si
 
 5. Open Dashboard:
    - Open Streamlit: http://localhost:8501
-   ![alt text](Documentation\English\Images\image7.png)
+   ![alt text](Documentation/English/Images/image7.png)
 
 To stop:
 - `docker compose down`

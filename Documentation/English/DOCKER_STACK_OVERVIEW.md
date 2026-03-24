@@ -13,9 +13,9 @@ The stack is designed to simulate a typical data engineering local environment:
 
 ### Screenshot placeholder (architecture diagram)
 
-Paste your diagram/screenshot here:
 
-![Architecture diagram - paste here](./_paste_architecture_diagram_here.png)
+
+![Architecture diagram](./Images/image6.png)
 
 ## Services
 
@@ -158,11 +158,6 @@ This stack supports a typical lakehouse-style project layout:
 - `data_lake/silver/`: cleaned/typed data (Delta/Parquet)
 - `data_lake/gold/`: analytics-ready tables for BI
 
-### Screenshot placeholder (project folder structure)
-
-Paste your screenshot here:
-
-![Folder structure - paste here](./_paste_folder_structure_here.png)
 
 ## Common operational checks
 
