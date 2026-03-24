@@ -1,16 +1,16 @@
-# 05 - Dashboard Streamlit (Python)
+# 05 - Streamlit Dashboard (Python)
 
-Este projeto agora usa **Streamlit** para visualização. O app lê os dados da camada Gold em **Parquet** direto do lake.
+This project uses **Streamlit** for visualization. The app reads Gold-layer data in **Parquet** directly from the lake.
 
-## Como rodar
-1. Suba a stack:
+## How to run
+1. Start the stack:
    - `docker compose up -d`
-2. Gere os dados da camada Gold:
+2. Generate Gold-layer data:
    - `python 04_analytics_gold/transform_gold.py`
-3. Abra o dashboard:
+3. Open the dashboard:
    - http://localhost:8501
 
-## Onde o app lê os dados
+## Where the app reads data from
 - `data_lake/gold/parquet/xlm_hourly`
 - `data_lake/gold/parquet/xlm_daily`
 - `data_lake/gold/parquet/xlm_by_country_daily`

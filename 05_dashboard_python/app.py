@@ -53,12 +53,12 @@ def load_parquet_table(table_name: str) -> pd.DataFrame:
     root = lake_root() / "gold" / "parquet"
     path = parquet_table_path(table_name)
     if not path.exists():
-        raise FileNotFoundError(f"Não encontrei a tabela '{table_name}' em: {path.as_posix()}")
+        raise FileNotFoundError(f"Couldn't find table '{table_name}' at: {path.as_posix()}")
     if path.is_file() and path.suffix.lower() == ".parquet":
         return pd.read_parquet(path)
 
     if not path.is_dir():
-        raise FileNotFoundError(f"Esperava um diretório ou arquivo .parquet, mas encontrei: {path.as_posix()}")
+        raise FileNotFoundError(f"Expected a directory or a .parquet file, but found: {path.as_posix()}")
 
     parquet_files = find_parquet_files(path)
     if not parquet_files:
@@ -69,7 +69,7 @@ def load_parquet_table(table_name: str) -> pd.DataFrame:
             candidate_files = find_parquet_files(c)
             if candidate_files:
                 return pd.read_parquet(candidate_files)
-        raise FileNotFoundError(f"Nenhum arquivo .parquet encontrado em: {path.as_posix()}")
+        raise FileNotFoundError(f"No .parquet files found at: {path.as_posix()}")
 
     return pd.read_parquet(parquet_files)
 
@@ -84,7 +84,7 @@ def load_silver_parquet_ticks() -> pd.DataFrame:
         return pd.DataFrame()
     files = find_parquet_files(path)
     if not files:
-        # tentar versões com run_id
+        # try run_id versions
         candidates = sorted((lake_root() / "silver" / "parquet").glob("xlm_price_ticks__*"), reverse=True)
         for c in candidates:
             cf = find_parquet_files(c)
@@ -107,14 +107,14 @@ def main() -> None:
     st.caption(f"Lake root: {lake_root().as_posix()}")
 
     with st.sidebar:
-        st.header("Atualização")
-        refresh_sec = st.number_input("Auto-refresh (segundos)", min_value=5, max_value=60, value=10, step=1)
+        st.header("Refresh")
+        refresh_sec = st.number_input("Auto-refresh (seconds)", min_value=5, max_value=60, value=10, step=1)
         try:
             from streamlit_autorefresh import st_autorefresh  # type: ignore
             st_autorefresh(interval=refresh_sec * 1000, key="auto-refresh-prices")
         except Exception:
             components.html(f"<script>setTimeout(function(){{window.location.reload();}}, {int(refresh_sec)*1000});</script>", height=0)
-        st.caption("Ative auto-refresh para ver os preços atualizarem.")
+        st.caption("Enable auto-refresh to see prices updating.")
 
     try:
         daily = load_parquet_table("xlm_daily").copy()
@@ -122,7 +122,7 @@ def main() -> None:
         by_country = load_parquet_table("xlm_by_country_daily").copy()
     except Exception as e:
         st.error(str(e))
-        st.info("Rode primeiro: python 04_analytics_gold/transform_gold.py para gerar os Parquets em data_lake/gold/parquet/.")
+        st.info("Run first: python 04_analytics_gold/transform_gold.py to generate Parquet files under data_lake/gold/parquet/.")
         return
     try:
         price_hourly_by_exchange = load_parquet_table("xlm_price_hourly_by_exchange").copy()
@@ -136,7 +136,7 @@ def main() -> None:
     ticks = load_silver_parquet_ticks().copy()
     ticks["event_ts"] = as_datetime(ticks, "event_ts")
     ticks = ticks.dropna(subset=["event_ts"]).sort_values(["event_ts", "exchange"])
-    # limitar à janela recente para gráfico mais útil
+    # limit to the most recent window for a more useful chart
     try:
         latest_ts = ticks["event_ts"].max()
         if pd.notna(latest_ts):
@@ -165,28 +165,28 @@ def main() -> None:
     max_day = daily["day_ts"].max()
 
     with st.sidebar:
-        st.header("Filtros")
+        st.header("Filters")
         if pd.isna(min_day) or pd.isna(max_day):
             date_range = None
         else:
             date_range = st.date_input(
-                "Intervalo de datas (diário)",
+                "Date range (daily)",
                 value=(min_day.date(), max_day.date()),
                 min_value=min_day.date(),
                 max_value=max_day.date(),
             )
 
-        top_n = st.slider("Top N países", min_value=5, max_value=30, value=10, step=1)
+        top_n = st.slider("Top N countries", min_value=5, max_value=30, value=10, step=1)
         if prices_available and "exchange" in price_daily_by_exchange.columns:
             exchanges = sorted([x for x in price_daily_by_exchange["exchange"].dropna().unique().tolist() if isinstance(x, str)])
-            selected_exchanges = st.multiselect("Exchanges (preços)", options=exchanges, default=exchanges)
+            selected_exchanges = st.multiselect("Exchanges (prices)", options=exchanges, default=exchanges)
         else:
             selected_exchanges = None
 
-    # seção principal focada em preços reais
-    st.subheader("Preços em tempo quase real (APIs a cada ~10s)")
+    # primary section focused on real prices
+    st.subheader("Near-real-time prices (APIs every ~10s)")
     if ticks_recent.empty:
-        st.info("Sem ticks de preço em Silver. Verifique producer (10s) e ingestão Bronze (1min), depois rode Silver.")
+        st.info("No price ticks found in Silver. Check the API producer (10s) and Bronze ingestion (1min), then run Silver.")
     else:
         if selected_exchanges:
             ticks_recent = ticks_recent[ticks_recent["exchange"].isin(selected_exchanges)]
@@ -195,10 +195,10 @@ def main() -> None:
             x="event_ts",
             y="last_price",
             color="exchange" if "exchange" in ticks_recent.columns else None,
-            title="Últimos preços (ticks) por exchange",
+            title="Latest prices (ticks) by exchange",
         )
         st.plotly_chart(fig_ticks, use_container_width=True)
-        # KPIs de último preço por exchange
+        # KPIs for latest price by exchange
         latest_rows = (
             ticks_recent.sort_values("event_ts")
             .groupby("exchange", as_index=False)
@@ -208,7 +208,7 @@ def main() -> None:
         kpis = st.columns(max(1, len(latest_rows)))
         for i, (_, row) in enumerate(latest_rows.iterrows()):
             with kpis[i]:
-                st.metric(f"{row['exchange']} (último)", float(row["last_price"]))
+                st.metric(f"{row['exchange']} (latest)", float(row["last_price"]))
 
     if date_range and isinstance(date_range, tuple) and len(date_range) == 2:
         start_day, end_day = date_range
@@ -239,20 +239,20 @@ def main() -> None:
 
     kpi1, kpi2, kpi3, kpi4 = st.columns(4)
     with kpi1:
-        st.metric("Tx count (período)", int(daily_f["tx_count"].sum()) if "tx_count" in daily_f.columns else 0)
+        st.metric("Tx count (period)", int(daily_f["tx_count"].sum()) if "tx_count" in daily_f.columns else 0)
     with kpi2:
         st.metric(
-            "Total volume XLM (período)",
+            "Total volume XLM (period)",
             float(daily_f["total_volume_xlm"].sum()) if "total_volume_xlm" in daily_f.columns else 0.0,
         )
     with kpi3:
         st.metric(
-            "Total notional USD (período)",
+            "Total notional USD (period)",
             float(daily_f["total_notional_usd"].sum()) if "total_notional_usd" in daily_f.columns else 0.0,
         )
     with kpi4:
         st.metric(
-            "Preço médio USD (período)",
+            "Average price USD (period)",
             float(daily_f["avg_price_usd"].mean()) if "avg_price_usd" in daily_f.columns else 0.0,
         )
 
@@ -262,7 +262,7 @@ def main() -> None:
             daily_f,
             x="day_ts",
             y="avg_price_usd",
-            title="Preço médio (USD) por dia",
+            title="Average price (USD) per day",
             markers=True,
         )
         st.plotly_chart(fig_price, use_container_width=True)
@@ -272,14 +272,14 @@ def main() -> None:
             daily_f,
             x="day_ts",
             y="total_volume_xlm",
-            title="Volume total (XLM) por dia",
+            title="Total volume (XLM) per day",
         )
         st.plotly_chart(fig_volume, use_container_width=True)
 
-    st.subheader("Preços por exchange (APIs)")
+    st.subheader("Prices by exchange (APIs)")
     if not prices_available:
         st.info(
-            "Tabelas de preços não encontradas. Rode: python 03_processing_silver/transform_silver.py e depois python 04_analytics_gold/transform_gold.py."
+            "Price tables not found. Run: python 03_processing_silver/transform_silver.py and then python 04_analytics_gold/transform_gold.py."
         )
     else:
         p1, p2 = st.columns(2)
@@ -289,7 +289,7 @@ def main() -> None:
                 x="day_ts",
                 y="avg_price",
                 color="exchange" if "exchange" in price_daily_f.columns else None,
-                title="Preço médio por dia (por exchange)",
+                title="Average price per day (by exchange)",
                 markers=True,
             )
             st.plotly_chart(fig_api_daily, use_container_width=True)
@@ -299,12 +299,12 @@ def main() -> None:
                 x="hour_ts",
                 y="avg_price",
                 color="exchange" if "exchange" in price_hourly_f.columns else None,
-                title="Preço médio por hora (por exchange)",
+                title="Average price per hour (by exchange)",
             )
             st.plotly_chart(fig_api_hourly, use_container_width=True)
 
-    with st.expander("Simulação de transações (Silver/Gold)", expanded=False):
-        st.subheader("Análise por país (diária)")
+    with st.expander("Transaction simulation (Silver/Gold)", expanded=False):
+        st.subheader("Country analysis (daily)")
         if "country_code" in by_country_f.columns and "total_notional_usd" in by_country_f.columns:
             by_country_agg = (
                 by_country_f.groupby("country_code", as_index=False)
@@ -320,11 +320,11 @@ def main() -> None:
                 by_country_agg,
                 x="country_code",
                 y="total_notional_usd",
-                title=f"Top {top_n} países por notional (USD)",
+                title=f"Top {top_n} countries by notional (USD)",
             )
             st.plotly_chart(fig_country, use_container_width=True)
 
-    st.subheader("Tabelas (amostra)")
+    st.subheader("Tables (sample)")
     t1, t2, t3, t4, t5 = st.columns(5)
     with t1:
         st.write("xlm_daily")
