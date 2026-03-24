@@ -101,6 +101,37 @@ services:
     networks:
       - xlm-net
 
+  pipeline-worker:
+    image: jupyter/pyspark-notebook:latest
+    container_name: xlm-pipeline-worker
+    command:
+      - bash
+      - -lc
+      - |
+        python -c 'import pyspark' >/dev/null 2>&1 || pip install --no-cache-dir pyspark==3.5.0 delta-spark==3.2.0;
+        echo "[pipeline-worker] started"; 
+        while true; do
+          echo "[pipeline-worker] tick: $(date -u +%FT%TZ)";
+          python /home/jovyan/work/02_ingestion_bronze/ingest_to_bronze.py --max-files 200 || true;
+          python /home/jovyan/work/03_processing_silver/transform_silver.py || true;
+          python /home/jovyan/work/04_analytics_gold/transform_gold.py || true;
+          sleep 60;
+        done
+    environment:
+      - LAKE_ROOT=/data_lake
+      - SPARK_MASTER=spark://spark-master:7077
+    volumes:
+      - ./data_lake:/home/jovyan/work/data_lake
+      - ./data_lake:/data_lake
+      - ./02_ingestion_bronze:/home/jovyan/work/02_ingestion_bronze
+      - ./03_processing_silver:/home/jovyan/work/03_processing_silver
+      - ./04_analytics_gold:/home/jovyan/work/04_analytics_gold
+    depends_on:
+      - spark-master
+    restart: unless-stopped
+    networks:
+      - xlm-net
+
 networks:
   xlm-net:
     driver: bridge

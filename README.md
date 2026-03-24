@@ -27,6 +27,7 @@ This repository simulates an end-to-end data pipeline (landing → bronze → si
 
 5. Open Dashboard:
    - Open Streamlit: http://localhost:8501
+   ![alt text](Documentation\English\Images\image7.png)
 
 To stop:
 - `docker compose down`

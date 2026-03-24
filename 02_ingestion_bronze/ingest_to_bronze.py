@@ -12,6 +12,7 @@ Usage:
 import argparse
 import json
 import shutil
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -109,9 +110,21 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Bronze directory (default: <repo>/data_lake/bronze).",
     )
-    parser.add_argument("--pattern", type=str, default="xlm_v1_*.json", help="Filename glob pattern to ingest.")
+    parser.add_argument("--pattern", type=str, default="xlm_*.json", help="Filename glob pattern to ingest.")
     parser.add_argument("--max-files", type=int, default=None, help="Optional limit of files to ingest.")
     parser.add_argument("--dry-run", action="store_true", help="Print actions without moving files.")
+    parser.add_argument(
+        "--interval-seconds",
+        type=float,
+        default=None,
+        help="If set, runs continuously, ingesting every N seconds.",
+    )
+    parser.add_argument(
+        "--iterations",
+        type=int,
+        default=None,
+        help="Optional number of iterations when running with --interval-seconds. If omitted, runs forever.",
+    )
     return parser.parse_args()
 
 
@@ -130,29 +143,46 @@ def main() -> int:
     if not landing_dir.exists():
         raise SystemExit(f"Landing directory does not exist: {landing_dir.as_posix()}")
 
-    # Collect source files
-    sources = sorted(landing_dir.glob(args.pattern))
-    if args.max_files is not None:
-        if args.max_files < 1:
-            raise SystemExit("--max-files must be >= 1")
-        sources = sources[: args.max_files]
+    if args.max_files is not None and args.max_files < 1:
+        raise SystemExit("--max-files must be >= 1")
+    if args.interval_seconds is not None and args.interval_seconds <= 0:
+        raise SystemExit("--interval-seconds must be > 0")
+    if args.iterations is not None and args.iterations < 1:
+        raise SystemExit("--iterations must be >= 1")
 
-    scanned = len(sources)
-    moved = 0
-    skipped = 0
+    iteration = 0
+    while True:
+        iteration += 1
+        iteration_start = time.monotonic()
 
-    # Process each file
-    for source_path in sources:
-        ok = ingest_one(source_path=source_path, bronze_root=bronze_dir, dry_run=args.dry_run)
-        if ok:
-            moved += 1
-        else:
-            skipped += 1
+        sources = sorted(landing_dir.glob(args.pattern))
+        if args.max_files is not None:
+            sources = sources[: args.max_files]
 
-    # Report results
-    result = IngestResult(scanned=scanned, moved=moved, skipped=skipped)
-    print(json.dumps(result.__dict__, separators=(",", ":")))
-    return 0
+        scanned = len(sources)
+        moved = 0
+        skipped = 0
+
+        for source_path in sources:
+            ok = ingest_one(source_path=source_path, bronze_root=bronze_dir, dry_run=args.dry_run)
+            if ok:
+                moved += 1
+            else:
+                skipped += 1
+
+        result = IngestResult(scanned=scanned, moved=moved, skipped=skipped)
+        if args.interval_seconds is None:
+            print(json.dumps(result.__dict__, separators=(",", ":")))
+            return 0
+
+        print(json.dumps({"iteration": iteration, **result.__dict__}, separators=(",", ":")))
+        if args.iterations is not None and iteration >= args.iterations:
+            return 0
+
+        elapsed = time.monotonic() - iteration_start
+        sleep_seconds = args.interval_seconds - elapsed
+        if sleep_seconds > 0:
+            time.sleep(sleep_seconds)
 
 
 if __name__ == "__main__":

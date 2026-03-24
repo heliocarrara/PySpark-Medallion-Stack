@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pyspark.sql import SparkSession
@@ -89,20 +90,33 @@ def main() -> int:
     # 1. Setup paths
     lake_root = find_lake_root(Path.cwd())
     silver_path = str(lake_root / "silver" / "xlm_transactions")
+    silver_prices_path = str(lake_root / "silver" / "xlm_price_ticks")
     gold_root = lake_root / "gold"
     gold_hourly_path = str(gold_root / "xlm_hourly")
     gold_daily_path = str(gold_root / "xlm_daily")
     gold_country_daily_path = str(gold_root / "xlm_by_country_daily")
+    gold_price_hourly_path = str(gold_root / "xlm_price_hourly_by_exchange")
+    gold_price_daily_path = str(gold_root / "xlm_price_daily_by_exchange")
     parquet_export_root = gold_root / "parquet"
     parquet_hourly_path = str(parquet_export_root / "xlm_hourly")
     parquet_daily_path = str(parquet_export_root / "xlm_daily")
     parquet_country_daily_path = str(parquet_export_root / "xlm_by_country_daily")
+    parquet_price_hourly_path = str(parquet_export_root / "xlm_price_hourly_by_exchange")
+    parquet_price_daily_path = str(parquet_export_root / "xlm_price_daily_by_exchange")
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    parquet_hourly_run_path = str(parquet_export_root / f"xlm_hourly__{run_id}")
+    parquet_daily_run_path = str(parquet_export_root / f"xlm_daily__{run_id}")
+    parquet_country_daily_run_path = str(parquet_export_root / f"xlm_by_country_daily__{run_id}")
+    parquet_price_hourly_run_path = str(parquet_export_root / f"xlm_price_hourly_by_exchange__{run_id}")
+    parquet_price_daily_run_path = str(parquet_export_root / f"xlm_price_daily_by_exchange__{run_id}")
 
     # 2. Build Spark Session
     spark = build_spark_session("engineering-project-xlm-gold")
 
     # 3. Read Silver Data (Delta)
     silver_df = spark.read.format("delta").load(silver_path)
+    price_silver_exists = Path(silver_prices_path).exists()
+    prices_df = spark.read.format("delta").load(silver_prices_path) if price_silver_exists else None
 
     # 4. Fetch User Data (PostgreSQL via JDBC)
     jdbc_url = "jdbc:postgresql://postgres:5432/xlm"
@@ -159,26 +173,66 @@ def main() -> int:
     ensure_writable_dir(Path(gold_hourly_path))
     ensure_writable_dir(Path(gold_daily_path))
     ensure_writable_dir(Path(gold_country_daily_path))
+    ensure_writable_dir(Path(gold_price_hourly_path))
+    ensure_writable_dir(Path(gold_price_daily_path))
     ensure_writable_dir(parquet_export_root)
-    ensure_writable_dir(Path(parquet_hourly_path))
-    ensure_writable_dir(Path(parquet_daily_path))
-    ensure_writable_dir(Path(parquet_country_daily_path))
 
     hourly_df.write.format("delta").mode("overwrite").save(gold_hourly_path)
     daily_df.write.format("delta").mode("overwrite").save(gold_daily_path)
     by_country_daily_df.write.format("delta").mode("overwrite").save(gold_country_daily_path)
 
-    hourly_df.write.mode("overwrite").parquet(parquet_hourly_path)
-    daily_df.write.mode("overwrite").parquet(parquet_daily_path)
-    by_country_daily_df.write.mode("overwrite").parquet(parquet_country_daily_path)
+    hourly_df.write.mode("overwrite").parquet(parquet_hourly_run_path)
+    daily_df.write.mode("overwrite").parquet(parquet_daily_run_path)
+    by_country_daily_df.write.mode("overwrite").parquet(parquet_country_daily_run_path)
+
+    if prices_df is not None:
+        price_hourly_by_exchange_df = (
+            prices_df.groupBy(
+                F.date_trunc("hour", F.col("event_ts")).alias("hour_ts"),
+                F.col("exchange"),
+                F.col("quote_symbol"),
+            )
+            .agg(
+                F.avg("last_price").alias("avg_price"),
+                F.min("last_price").alias("min_price"),
+                F.max("last_price").alias("max_price"),
+                F.count(F.lit(1)).alias("tick_count"),
+            )
+            .orderBy(F.col("hour_ts").asc(), F.col("exchange").asc())
+        )
+        price_daily_by_exchange_df = (
+            prices_df.groupBy(
+                F.date_trunc("day", F.col("event_ts")).alias("day_ts"),
+                F.col("exchange"),
+                F.col("quote_symbol"),
+            )
+            .agg(
+                F.avg("last_price").alias("avg_price"),
+                F.min("last_price").alias("min_price"),
+                F.max("last_price").alias("max_price"),
+                F.count(F.lit(1)).alias("tick_count"),
+            )
+            .orderBy(F.col("day_ts").asc(), F.col("exchange").asc())
+        )
+
+        price_hourly_by_exchange_df.write.format("delta").mode("overwrite").save(gold_price_hourly_path)
+        price_daily_by_exchange_df.write.format("delta").mode("overwrite").save(gold_price_daily_path)
+        price_hourly_by_exchange_df.write.mode("overwrite").parquet(parquet_price_hourly_run_path)
+        price_daily_by_exchange_df.write.mode("overwrite").parquet(parquet_price_daily_run_path)
 
     # 10. Results
     print(f"WROTE Delta: {gold_hourly_path}")
     print(f"WROTE Delta: {gold_daily_path}")
     print(f"WROTE Delta: {gold_country_daily_path}")
-    print(f"WROTE Parquet: {parquet_hourly_path}")
-    print(f"WROTE Parquet: {parquet_daily_path}")
-    print(f"WROTE Parquet: {parquet_country_daily_path}")
+    if prices_df is not None:
+        print(f"WROTE Delta: {gold_price_hourly_path}")
+        print(f"WROTE Delta: {gold_price_daily_path}")
+    print(f"WROTE Parquet: {parquet_hourly_run_path}")
+    print(f"WROTE Parquet: {parquet_daily_run_path}")
+    print(f"WROTE Parquet: {parquet_country_daily_run_path}")
+    if prices_df is not None:
+        print(f"WROTE Parquet: {parquet_price_hourly_run_path}")
+        print(f"WROTE Parquet: {parquet_price_daily_run_path}")
     print("FINISHED.")
 
     spark.stop()

@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from pyspark.sql import SparkSession
@@ -58,6 +59,8 @@ def build_spark_session(app_name: str) -> SparkSession:
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
         .config("spark.jars.packages", "io.delta:delta-spark_2.12:3.2.0")
+        .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
+        .config("spark.hadoop.mapreduce.fileoutputcommitter.cleanup-failures.ignored", "true")
         .getOrCreate()
     )
 
@@ -82,10 +85,18 @@ def main() -> int:
     bronze_path = str(lake_root / "bronze")
     silver_base_dir = lake_root / "silver"
     silver_dir = silver_base_dir / "xlm_transactions"
+    silver_prices_dir = silver_base_dir / "xlm_price_ticks"
+    silver_parquet_dir = silver_base_dir / "parquet"
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    silver_prices_parquet_run = silver_parquet_dir / f"xlm_price_ticks__{run_id}"
 
     ensure_writable_dir(silver_base_dir)
     ensure_writable_dir(silver_dir)
+    ensure_writable_dir(silver_prices_dir)
+    ensure_writable_dir(silver_parquet_dir)
     silver_path = str(silver_dir)
+    silver_prices_path = str(silver_prices_dir)
+    silver_prices_parquet_run_path = str(silver_prices_parquet_run)
 
     # 2. Build Spark Session
     spark = build_spark_session("engineering-project-xlm-silver")
@@ -106,6 +117,7 @@ def main() -> int:
 
     # 4. Read raw JSON data
     raw_df = spark.read.schema(schema).option("recursiveFileLookup", "true").json(bronze_path)
+    raw_any_df = spark.read.option("recursiveFileLookup", "true").json(bronze_path)
 
     # 5. Transformations: cast timestamp and impute
     df = raw_df.withColumn(
@@ -129,16 +141,45 @@ def main() -> int:
         .filter(F.col("price_usd").isNotNull())
     )
 
+    api_df = (
+        raw_any_df.filter(F.col("schema_version") == F.lit("api_v1"))
+        .withColumn(
+            "event_ts",
+            F.to_timestamp(F.col("event_ts"), "yyyy-MM-dd'T'HH:mm:ss.SSSX"),
+        )
+        .select(
+            F.col("asset_symbol").cast("string").alias("asset_symbol"),
+            F.col("exchange").cast("string").alias("exchange"),
+            F.col("url").cast("string").alias("url"),
+            F.col("event_ts").alias("event_ts"),
+            F.col("parsed.last_price").cast("double").alias("last_price"),
+            F.col("parsed.quote_symbol").cast("string").alias("quote_symbol"),
+            F.col("parsed.parse_error").cast("string").alias("parse_error"),
+            F.col("schema_version").cast("string").alias("schema_version"),
+        )
+    )
+
+    clean_api_df = (
+        api_df.filter(F.col("event_ts").isNotNull())
+        .filter(F.col("exchange").isNotNull())
+        .filter(F.col("last_price").isNotNull())
+        .filter(F.col("parse_error").isNull())
+    )
+
     # 6. Write to Silver (Delta)
     clean_df.write.format("delta").mode("overwrite").save(silver_path)
+    clean_api_df.write.format("delta").mode("overwrite").save(silver_prices_path)
+    clean_api_df.write.mode("overwrite").parquet(silver_prices_parquet_run_path)
 
     # 7. Finalize
     print(f"WROTE {silver_path}")
     print(f"ROWS {clean_df.count()}")
+    print(f"WROTE {silver_prices_path}")
+    print(f"ROWS {clean_api_df.count()}")
+    print(f"WROTE {silver_prices_parquet_run_path}")
     spark.stop()
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
