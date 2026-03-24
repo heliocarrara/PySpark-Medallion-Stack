@@ -56,6 +56,8 @@ def build_spark_session(app_name: str) -> SparkSession:
         .master(spark_master)
         .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
         .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+        .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
+        .config("spark.hadoop.mapreduce.fileoutputcommitter.cleanup-failures.ignored", "true")
         .config(
             "spark.jars.packages",
             ",".join(
@@ -91,10 +93,10 @@ def main() -> int:
     gold_hourly_path = str(gold_root / "xlm_hourly")
     gold_daily_path = str(gold_root / "xlm_daily")
     gold_country_daily_path = str(gold_root / "xlm_by_country_daily")
-    pbi_export_root = gold_root / "pbi"
-    pbi_hourly_path = str(pbi_export_root / "xlm_hourly")
-    pbi_daily_path = str(pbi_export_root / "xlm_daily")
-    pbi_country_daily_path = str(pbi_export_root / "xlm_by_country_daily")
+    parquet_export_root = gold_root / "parquet"
+    parquet_hourly_path = str(parquet_export_root / "xlm_hourly")
+    parquet_daily_path = str(parquet_export_root / "xlm_daily")
+    parquet_country_daily_path = str(parquet_export_root / "xlm_by_country_daily")
 
     # 2. Build Spark Session
     spark = build_spark_session("engineering-project-xlm-gold")
@@ -157,32 +159,27 @@ def main() -> int:
     ensure_writable_dir(Path(gold_hourly_path))
     ensure_writable_dir(Path(gold_daily_path))
     ensure_writable_dir(Path(gold_country_daily_path))
-    ensure_writable_dir(pbi_export_root)
-    ensure_writable_dir(Path(pbi_hourly_path))
-    ensure_writable_dir(Path(pbi_daily_path))
-    ensure_writable_dir(Path(pbi_country_daily_path))
+    ensure_writable_dir(parquet_export_root)
+    ensure_writable_dir(Path(parquet_hourly_path))
+    ensure_writable_dir(Path(parquet_daily_path))
+    ensure_writable_dir(Path(parquet_country_daily_path))
 
     hourly_df.write.format("delta").mode("overwrite").save(gold_hourly_path)
     daily_df.write.format("delta").mode("overwrite").save(gold_daily_path)
     by_country_daily_df.write.format("delta").mode("overwrite").save(gold_country_daily_path)
 
-    # 9. Write to Serving Layer (Postgres) for Power BI
-    print("Writing gold tables to Postgres serving layer...")
-    hourly_df.write.jdbc(url=jdbc_url, table="gold_xlm_hourly", mode="overwrite", properties=jdbc_props)
-    daily_df.write.jdbc(url=jdbc_url, table="gold_xlm_daily", mode="overwrite", properties=jdbc_props)
-    by_country_daily_df.write.jdbc(url=jdbc_url, table="gold_xlm_by_country_daily", mode="overwrite", properties=jdbc_props)
-    hourly_df.write.mode("overwrite").parquet(pbi_hourly_path)
-    daily_df.write.mode("overwrite").parquet(pbi_daily_path)
-    by_country_daily_df.write.mode("overwrite").parquet(pbi_country_daily_path)
+    hourly_df.write.mode("overwrite").parquet(parquet_hourly_path)
+    daily_df.write.mode("overwrite").parquet(parquet_daily_path)
+    by_country_daily_df.write.mode("overwrite").parquet(parquet_country_daily_path)
 
     # 10. Results
     print(f"WROTE Delta: {gold_hourly_path}")
     print(f"WROTE Delta: {gold_daily_path}")
     print(f"WROTE Delta: {gold_country_daily_path}")
-    print(f"WROTE Parquet: {pbi_hourly_path}")
-    print(f"WROTE Parquet: {pbi_daily_path}")
-    print(f"WROTE Parquet: {pbi_country_daily_path}")
-    print("FINISHED writing to Postgres.")
+    print(f"WROTE Parquet: {parquet_hourly_path}")
+    print(f"WROTE Parquet: {parquet_daily_path}")
+    print(f"WROTE Parquet: {parquet_country_daily_path}")
+    print("FINISHED.")
 
     spark.stop()
     return 0

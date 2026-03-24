@@ -5,6 +5,7 @@ This repository ships a local infrastructure stack using Docker Compose so you c
 - Postgres (data source simulation)
 - Spark (master + worker) for distributed processing
 - JupyterLab (PySpark-ready) for notebooks and exploration
+- Streamlit (Python dashboard)
 
 ## Prerequisites
 
@@ -104,6 +105,7 @@ docker compose up -d
 - Spark Master UI: http://localhost:8080
 - Spark Worker UI: http://localhost:8081
 - JupyterLab: http://localhost:8888
+- Streamlit: http://localhost:8501
 - Postgres: localhost:5432
 
 ## Logs and debugging
@@ -118,6 +120,7 @@ Logs for one service:
 
 ```bash
 docker compose logs -f jupyter
+docker compose logs -f streamlit
 docker compose logs -f spark-master
 docker compose logs -f spark-worker-1
 docker compose logs -f postgres
@@ -153,4 +156,3 @@ spark = (
     .getOrCreate()
 )
 ```
-

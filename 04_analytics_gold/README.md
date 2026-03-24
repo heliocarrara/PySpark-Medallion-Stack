@@ -40,5 +40,5 @@ python 04_analytics_gold/transform_gold.py
 - PostgreSQL JDBC driver (configured in the script).
 
 ## Output
-- **Format**: Delta
-- **Location**: `data_lake/gold/{xlm_hourly, xlm_daily, xlm_by_country_daily}`
+- **Delta**: `data_lake/gold/{xlm_hourly, xlm_daily, xlm_by_country_daily}`
+- **Parquet (for Streamlit)**: `data_lake/gold/parquet/{xlm_hourly, xlm_daily, xlm_by_country_daily}`

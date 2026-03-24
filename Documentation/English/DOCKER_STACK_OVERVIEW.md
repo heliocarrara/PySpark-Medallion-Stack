@@ -118,6 +118,24 @@ Paste your diagram/screenshot here:
 
 ![alt text](Images/image4.png)
 
+### 5) `streamlit` (dashboard)
+
+**Image**
+- `python:3.11-slim`
+
+**Why it exists**
+- Provides a lightweight Python dashboard to visualize Gold tables
+- Reads Parquet exports from `data_lake/gold/parquet/` written by the Gold job
+
+**Ports**
+- `8501`: Streamlit UI (host: http://localhost:8501)
+
+**Volumes**
+- `./05_dashboard_python` → `/app`
+  - Dashboard code (`app.py`)
+- `./data_lake` → `/data_lake`
+  - Reads Gold Parquet directly from the shared lake folder
+
 ## Networks
 
 ### `xlm-net` (bridge network)
@@ -128,6 +146,7 @@ Paste your diagram/screenshot here:
   - `spark-master`
   - `spark-worker-1`
   - `jupyter`
+  - `streamlit`
 - Makes Spark master/worker communication stable and predictable.
 
 ## Data flow (how the stack supports the project folders)
@@ -166,3 +185,5 @@ Spark UIs:
 Jupyter:
 - http://localhost:8888
 
+Streamlit:
+- http://localhost:8501

@@ -17,13 +17,13 @@
 ├── **04_analytics_gold/** # STAGE 4: Modeling (SQL)
 │   └── **model_gold_tables.sql** # Aggregation queries and KPIs
 │
-├── **05_dashboard_pbi/** # STAGE 5: Visualization
-│   └── **xlm_dashboard.pbix** # Power BI file
+├── **05_dashboard_python/** # STAGE 5: Visualization
+│   └── **app.py** # Streamlit dashboard app (reads Gold Parquet)
 │
 └── **data_lake/** # LOCAL FOLDER (Simulates Azure Data Lake)
     ├── **landing/** # Where "raw" data first lands
     ├── **bronze/** # Organized original data
     ├── **silver/** # Cleaned data (Delta)
-    └── **gold/** # Aggregated data (Ready for PBI)
+    └── **gold/** # Aggregated data (Delta + Parquet export for Streamlit)
 
 ---

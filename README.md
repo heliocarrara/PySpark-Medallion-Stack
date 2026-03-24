@@ -2,29 +2,31 @@
 
 This repository simulates an end-to-end data pipeline (landing → bronze → silver → gold) using Docker for local infrastructure.
 
+![alt text](Documentation\English\Images\image6.png)
+
 ## Architecture
 - Postgres: simulates user registry/reference data.
 - Spark (master + worker): distributed data processing.
 - JupyterLab (PySpark): notebook-based development and exploration.
 - data_lake/: local folder acting as Azure Data Lake Gen2.
 
-Diagram: create in Excalidraw and export as an image. Suggestion: https://excalidraw.com/
-
 ## How to Run
 1. Install and open Docker Desktop.
 2. From the project root, run:
    - `docker compose up -d`
+   ![alt text](Documentation\English\Images\image5.png)
 3. Verify:
    - Spark Master UI: http://localhost:8080
    - Spark Worker UI: http://localhost:8081
    - JupyterLab: http://localhost:8888
    - Postgres: localhost:5432
+   - Streamlit Dashboard: http://localhost:8501
 
 4. Run Analytics (Gold Layer):
    - `python 04_analytics_gold/transform_gold.py`
 
 5. Open Dashboard:
-   - Connect Power BI Desktop to `localhost:5432` (Postgres) as described in [05_dashboard_pbi](file:///c:/Users/helio/source/repos/engineering-project-xlm/05_dashboard_pbi).
+   - Open Streamlit: http://localhost:8501
 
 To stop:
 - `docker compose down`
@@ -51,5 +53,5 @@ spark = (
 ```
 
 ## Folder Structure
-See the folder map: [folders-map.md](file:///c:/Users/helio/source/repos/engineering-project-xlm/folders-map.md)
+See the folder map: [folders-map.md](file:///c:/Users/helio/source/repos/engineering-project-xlm/Documentation/English/folders-map.md)
 

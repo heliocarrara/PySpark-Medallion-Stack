@@ -5,7 +5,7 @@
 * **`docker-compose.yml`**: Defines the local infrastructure. It should start containers for **Spark**, **Postgres** (to simulate user registry/reference data), and **JupyterLab** (so you can code notebooks from VS Code via browser or extension).
 * **`README.md`**: Your project overview. Include an architecture diagram (you can draw it in [Excalidraw](https://excalidraw.com/)), explain the stack, and provide instructions to run `docker compose`.
 * **`.gitignore`**: Essential to avoid committing junk, `__pycache__` folders, or heavy data from `data_lake/` (commit only the folder structure, not thousands of JSONs).
-* Status: Infra iniciada com Docker Compose (xlm-postgres, xlm-spark-master, xlm-spark-worker-1, xlm-jupyter em execução).
+* Status: Infra iniciada com Docker Compose (xlm-postgres, xlm-spark-master, xlm-spark-worker-1, xlm-jupyter, xlm-streamlit em execução).
 
 ---
 
@@ -47,10 +47,11 @@ Prepare the banquet for business analysts.
 
 ---
 
-### 6. `05_dashboard_pbi/` (Visualization)
-* **`xlm_dashboard.pbix`**: The final file.
-* **Pro Tip**: Since you used Docker, in Power BI select “Get Data” → “Folder” and point to `data_lake/gold/`. When new data arrives in Gold via Spark, Power BI refreshes on click.
-* Status: Pasta pronta para conectar o Power BI a `data_lake/gold/` (usar “Get Data” → “Folder”).
+### 6. `05_dashboard_python/` (Visualization)
+* **`app.py`**: Streamlit app que lê as tabelas da camada Gold e renderiza gráficos.
+* **Como consome dados**: lê os Parquets gerados em `data_lake/gold/parquet/` (`xlm_hourly`, `xlm_daily`, `xlm_by_country_daily`).
+* **Como rodar**: subir o serviço `streamlit` no `docker-compose.yml` e abrir http://localhost:8501.
+* Status: Dashboard Streamlit pronto (porta 8501) lendo Parquet da camada Gold.
 
 ---
 
